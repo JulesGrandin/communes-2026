@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Explorateur de noms de communes — France 2026</title>
+  <style>
+    :root {
+      --bg: #f4f2ed;
+      --surface: #fffefb;
+      --ink: #1c1917;
+      --muted: #57534e;
+      --accent: #0f766e;
+      --accent-soft: #ccfbf1;
+      --border: #d6d3d1;
+      --danger: #b91c1c;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgb(28 25 23 / 8%);
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, "Cascadia Code", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: linear-gradient(165deg, #e7e5e4 0%, var(--bg) 40%, #fafaf9 100%);
+      color: var(--ink);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    header {
+      margin-bottom: 1.75rem;
+    }
+
+    header h1 {
+      font-size: 1.65rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.35rem;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .load-banner {
+      display: none;
+      padding: 0.85rem 1rem;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    .load-banner.visible { display: block; }
+
+    .load-banner button {
+      margin-top: 0.5rem;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .tabs button {
+      flex: 1;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      background: #fafaf9;
+      border-radius: 8px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.92rem;
+    }
+
+    .tabs button[aria-selected="true"] {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: #115e59;
+      font-weight: 600;
+    }
+
+    label.field-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: var(--muted);
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      font: inherit;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+    }
+
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin: 1rem 0;
+      align-items: center;
+    }
+
+    .options fieldset {
+      border: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .options legend {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .radio-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+    }
+
+    .radio-row label {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .check-row label {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.45rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: #fff;
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button.secondary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .results-summary {
+      display: none;
+      padding: 1rem 1.1rem;
+      background: #f0fdfa;
+      border: 1px solid #99f6e4;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+    }
+
+    .results-summary.visible { display: block; }
+
+    .results-summary .count {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #0f766e;
+    }
+
+    .results-summary .meta {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    .results-body { display: none; }
+    .results-body.visible { display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      background: #fafaf9;
+    }
+
+    tr:hover td { background: #fafaf9; }
+
+    .mark {
+      background: #fde68a;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
+    .type-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      background: #e7e5e4;
+      color: var(--muted);
+    }
+
+    .expand-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      padding: 0;
+    }
+
+    .expand-btn:hover { text-decoration: underline; }
+
+    .nested-table {
+      margin: 0.5rem 0 0.75rem;
+      background: #fafaf9;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .nested-table table { font-size: 0.82rem; }
+
+    .progress {
+      display: none;
+      margin-top: 0.75rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .progress.visible { display: block; }
+
+    .progress-bar {
+      height: 6px;
+      background: #e7e5e4;
+      border-radius: 3px;
+      margin-top: 0.35rem;
+      overflow: hidden;
+    }
+
+    .progress-bar > div {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.2s;
+    }
+
+    .hidden { display: none !important; }
+
+    footer.note {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 640px) {
+      th:nth-child(4), td:nth-child(4),
+      th:nth-child(5), td:nth-child(5) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Explorateur de noms de communes</h1>
+      <p>Recherche dans le référentiel officiel 2026 (<span id="stat-communes">…</span> entités chargées).</p>
+    </header>
+
+    <div id="load-banner" class="load-banner">
+      Impossible de charger <code>v_commune_2026.csv</code> automatiquement (ouvrir la page via un serveur local, ou choisir le fichier).
+      <br />
+      <button type="button" class="secondary" id="btn-pick-csv">Choisir v_commune_2026.csv</button>
+      <input type="file" id="csv-file" accept=".csv,text/csv" class="hidden" />
+    </div>
+
+    <section class="panel">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-single" aria-selected="true" aria-controls="panel-single">Un terme</button>
+        <button type="button" role="tab" id="tab-multi" aria-selected="false" aria-controls="panel-multi">Une liste de termes</button>
+      </div>
+
+      <div id="panel-single" role="tabpanel">
+        <label class="field-label" for="query-single">Terme recherché</label>
+        <input type="text" id="query-single" placeholder="Ex. saint, sur, bugey…" autocomplete="off" />
+      </div>
+
+      <div id="panel-multi" role="tabpanel" class="hidden">
+        <label class="field-label" for="query-multi">Un terme par ligne</label>
+        <textarea id="query-multi" placeholder="martin&#10;beaulieu&#10;saint-sauveur"></textarea>
+        <p class="meta" style="font-size:0.82rem;color:var(--muted);margin:0.35rem 0 0;">Les lignes vides sont ignorées. Les doublons sont signalés mais conservés.</p>
+      </div>
+
+      <div class="options">
+        <fieldset>
+          <legend>Position du terme</legend>
+          <div class="radio-row">
+            <label><input type="radio" name="position" value="anywhere" checked /> N'importe où</label>
+            <label><input type="radio" name="position" value="start" /> Au début</label>
+            <label><input type="radio" name="position" value="end" /> À la fin</label>
+          </div>
+        </fieldset>
+        <div class="check-row">
+          <label>
+            <input type="checkbox" id="ignore-accents" checked />
+            <span><strong>Ignorer les accents</strong> — si coché, <em>rouge</em> trouve aussi <em>Rougé</em> ; si décoché, la recherche respecte e/é, a/à, etc.</span>
+          </label>
+        </div>
+        <div class="check-row">
+          <label>
+            <input type="checkbox" id="exact-word" />
+            <span><strong>Contient le mot exact</strong> — le terme doit apparaître comme segment entier (séparé par un espace ou un tiret), pas au milieu d’un mot (<em>Rose</em> dans <em>Parigny-la-Rose</em> oui, dans <em>Anrosey</em> non)</span>
+          </label>
+        </div>
+        <div class="check-row">
+          <label>
+            <input type="checkbox" id="exact-term" />
+            <span><strong>Terme exact</strong> — le nom (hors article <em>Le, La, Les, L'…</em>) doit être identique au terme, et non contenu dans un mot plus long (<em>Colombe</em> oui, <em>Sainte-Colombe</em> ou <em>Colombey…</em> non)</span>
+          </label>
+        </div>
+        <div class="check-row" id="exact-article-row">
+          <label>
+            <input type="checkbox" id="exact-with-article" disabled />
+            <span><strong>Terme exact avec article</strong> — compare le nom complet tel qu’affiché (<em>Le Caire</em>, <em>L'Abergement-Clémenciat</em>…). Ne s’applique qu’avec « Terme exact » coché.</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="primary" id="btn-search" disabled>Rechercher</button>
+      </div>
+      <div id="search-progress" class="progress">
+        <span id="search-progress-text"></span>
+        <div class="progress-bar"><div id="search-progress-fill"></div></div>
+      </div>
+    </section>
+
+    <section id="results-summary" class="results-summary" aria-live="polite">
+      <div class="count" id="summary-count"></div>
+      <div class="meta" id="summary-meta"></div>
+      <div class="actions" style="margin-top:0.75rem;">
+        <button type="button" class="secondary" id="btn-toggle-list">Voir la liste</button>
+        <button type="button" class="secondary" id="btn-export-summary" disabled>Exporter (résumé)</button>
+        <button type="button" class="secondary" id="btn-export-detail" disabled>Exporter (détail)</button>
+      </div>
+    </section>
+
+    <section id="results-body" class="results-body panel">
+      <div id="results-single"></div>
+      <div class="actions" style="margin-top:1rem;">
+        <button type="button" class="secondary" id="btn-geocode">Géocoder les résultats affichés</button>
+      </div>
+      <div id="geocode-progress" class="progress">
+        <span id="geocode-progress-text"></span>
+        <div class="progress-bar"><div id="geocode-progress-fill"></div></div>
+      </div>
+    </section>
+
+    <footer class="note">
+      Géocodage via l’API Géoplateforme (<a href="https://cartes.gouv.fr/aide/fr/guides-utilisateur/utiliser-les-services-de-la-geoplateforme/geocodage/" target="_blank" rel="noopener">documentation</a>).
+      Les communes homonymes sont distinguées par le code Insee lors du géocodage.
+    </footer>
+  </div>
+
+  <script>
+    const CSV_PATH = "v_commune_2026.csv";
+    const GEOCODE_URL = "https://data.geopf.fr/geocodage/search";
+    const GEOCODE_CSV_URL = "https://data.geopf.fr/geocodage/search/csv";
+    const AUTO_SHOW_LIST_MAX = 100;
+
+    const TYPE_LABELS = {
+      COM: "Commune",
+      COMD: "Commune déléguée",
+      COMA: "Commune associée",
+      ARM: "Arrondissement municipal",
+    };
+
+    /** @type {Array<object>} */
+    let allRows = [];
+    let mode = "single";
+    let lastSearch = null;
+    let listVisible = false;
+    let searchRunning = false;
+    let searchJobId = 0;
+
+    const $ = (id) => document.getElementById(id);
+
+    function yieldToMain() {
+      return new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    function setSearchProgress(visible, done, total, currentTerm) {
+      const wrap = $("search-progress");
+      const text = $("search-progress-text");
+      const fill = $("search-progress-fill");
+      wrap.classList.toggle("visible", visible);
+      if (!visible) {
+        text.textContent = "";
+        fill.style.width = "0%";
+        return;
+      }
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      fill.style.width = `${pct}%`;
+      const termPreview = currentTerm
+        ? ` — « ${currentTerm.length > 40 ? currentTerm.slice(0, 37) + "…" : currentTerm} »`
+        : "";
+      text.textContent = `Recherche en cours… ${done.toLocaleString("fr-FR")} / ${total.toLocaleString("fr-FR")} terme${total !== 1 ? "s" : ""}${termPreview}`;
+    }
+
+    function normalize(str) {
+      return str
+        .normalize("NFD")
+        .replace(/\p{M}/gu, "")
+        .replace(/œ/gi, "oe")
+        .replace(/æ/gi, "ae")
+        .toLowerCase();
+    }
+
+    function foldCase(str) {
+      return str.toLowerCase();
+    }
+
+    function foldForSearch(str, accentSensitive) {
+      return accentSensitive ? foldCase(str) : normalize(str);
+    }
+
+    const ARTICLE_PREFIXES = [
+      { re: /^L'/i, label: "L'" },
+      { re: /^Le\s+/i, label: "Le" },
+      { re: /^La\s+/i, label: "La" },
+      { re: /^Les\s+/i, label: "Les" },
+      { re: /^Los\s+/i, label: "Los" },
+      { re: /^Las\s+/i, label: "Las" },
+    ];
+
+    function splitArticle(libelle) {
+      for (const { re, label } of ARTICLE_PREFIXES) {
+        const m = libelle.match(re);
+        if (m) {
+          return { article: label, core: libelle.slice(m[0].length).trim() };
+        }
+      }
+      return { article: "", core: libelle.trim() };
+    }
+
+    function countWords(libelle) {
+      const { core } = splitArticle(libelle);
+      if (!core) return 0;
+      return core.split(/[\s-]+/).filter(Boolean).length;
+    }
+
+    function parseCSV(text) {
+      const rows = [];
+      let i = 0;
+      const len = text.length;
+
+      function readField() {
+        let field = "";
+        if (text[i] === '"') {
+          i++;
+          while (i < len) {
+            if (text[i] === '"') {
+              if (text[i + 1] === '"') {
+                field += '"';
+                i += 2;
+              } else {
+                i++;
+                break;
+              }
+            } else {
+              field += text[i++];
+            }
+          }
+          if (text[i] === ",") i++;
+        } else {
+          while (i < len && text[i] !== "," && text[i] !== "\n" && text[i] !== "\r") {
+            field += text[i++];
+          }
+          if (text[i] === ",") i++;
+        }
+        return field;
+      }
+
+      const headers = [];
+      while (i < len && text[i] !== "\n" && text[i] !== "\r") {
+        headers.push(readField());
+      }
+      if (text[i] === "\r") i++;
+      if (text[i] === "\n") i++;
+
+      while (i < len) {
+        if (text[i] === "\r") { i++; continue; }
+        if (text[i] === "\n") { i++; continue; }
+        const row = {};
+        for (let h = 0; h < headers.length; h++) {
+          row[headers[h]] = readField();
+        }
+        rows.push(row);
+        if (text[i] === "\r") i++;
+        if (text[i] === "\n") i++;
+      }
+      return rows;
+    }
+
+    function enrichRow(row) {
+      const libelle = row.LIBELLE || "";
+      const { article } = splitArticle(libelle);
+      return {
+        ...row,
+        libelle,
+        norm: normalize(libelle),
+        wordCount: countWords(libelle),
+        article,
+        typeLabel: TYPE_LABELS[row.TYPECOM] || row.TYPECOM,
+      };
+    }
+
+    async function loadCSVFromText(text) {
+      const raw = parseCSV(text);
+      allRows = raw.map(enrichRow);
+      $("stat-communes").textContent = allRows.length.toLocaleString("fr-FR");
+      $("btn-search").disabled = false;
+      $("load-banner").classList.remove("visible");
+    }
+
+    async function tryFetchCSV() {
+      try {
+        const res = await fetch(CSV_PATH);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        await loadCSVFromText(await res.text());
+      } catch {
+        $("load-banner").classList.add("visible");
+        $("stat-communes").textContent = "0";
+      }
+    }
+
+    function getPosition() {
+      return document.querySelector('input[name="position"]:checked').value;
+    }
+
+    function filteredPool() {
+      return allRows.filter((r) => r.TYPECOM === "COM");
+    }
+
+    function nameSegments(libelle, accentSensitive) {
+      const { core } = splitArticle(libelle);
+      return core.split(/[\s-]+/).filter(Boolean).map((s) => foldForSearch(s, accentSensitive));
+    }
+
+    function exactPrefixBoundary(foldFull, foldedTerm) {
+      if (!foldFull.startsWith(foldedTerm)) return false;
+      if (foldFull.length === foldedTerm.length) return true;
+      const next = foldFull[foldedTerm.length];
+      return next === " " || next === "-";
+    }
+
+    function exactSuffixBoundary(foldFull, foldedTerm) {
+      if (!foldFull.endsWith(foldedTerm)) return false;
+      if (foldFull.length === foldedTerm.length) return true;
+      const before = foldFull[foldFull.length - foldedTerm.length - 1];
+      return before === " " || before === "-";
+    }
+
+    function matchesTerm(libelle, term, position, exact, exactWithArticle, exactWord, accentSensitive) {
+      const raw = term.trim();
+      if (!raw) return false;
+      const foldedTerm = foldForSearch(raw, accentSensitive);
+      const foldFull = foldForSearch(libelle, accentSensitive);
+      const foldCore = foldForSearch(splitArticle(libelle).core, accentSensitive);
+      const segments = nameSegments(libelle, accentSensitive);
+
+      if (exact) {
+        if (exactWithArticle) {
+          if (position === "start") return exactPrefixBoundary(foldFull, foldedTerm);
+          if (position === "end") return exactSuffixBoundary(foldFull, foldedTerm);
+          return foldFull === foldedTerm;
+        }
+        if (position === "start") return segments[0] === foldedTerm;
+        if (position === "end") {
+          return segments.length > 0 && segments[segments.length - 1] === foldedTerm;
+        }
+        return foldCore === foldedTerm;
+      }
+
+      if (exactWord) {
+        if (position === "start") return segments[0] === foldedTerm;
+        if (position === "end") {
+          return segments.length > 0 && segments[segments.length - 1] === foldedTerm;
+        }
+        return segments.includes(foldedTerm);
+      }
+
+      if (position === "start") return foldFull.startsWith(foldedTerm);
+      if (position === "end") return foldFull.endsWith(foldedTerm);
+      return foldFull.includes(foldedTerm);
+    }
+
+    function searchTerm(term, pool, position, exact, exactWithArticle, exactWord, accentSensitive) {
+      if (!term.trim()) return [];
+      return pool.filter((r) =>
+        matchesTerm(r.libelle, term, position, exact, exactWithArticle, exactWord, accentSensitive)
+      );
+    }
+
+    function matchModeLabel(exact, exactWithArticle, exactWord) {
+      if (exact) {
+        return exactWithArticle ? "terme exact (avec article)" : "terme exact (sans article)";
+      }
+      if (exactWord) return "mot exact dans le nom";
+      return "contient le terme";
+    }
+
+    function syncSearchModeOptions() {
+      const exactOn = $("exact-term").checked;
+      const wordOn = $("exact-word").checked;
+      $("exact-with-article").disabled = !exactOn;
+      if (!exactOn) $("exact-with-article").checked = false;
+      $("exact-word").disabled = exactOn;
+      $("exact-term").disabled = wordOn;
+    }
+
+    function accentPattern(term) {
+      const map = {
+        a: "[aàâäá]", e: "[eéèêë]", i: "[iîïí]", o: "[oôöó]", u: "[uùûüú]",
+        c: "[cç]", y: "[yÿ]", n: "[nñ]",
+      };
+      let out = "";
+      for (const ch of term) {
+        const low = ch.toLowerCase();
+        if (map[low]) out += map[low];
+        else out += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+      return new RegExp(out, "gi");
+    }
+
+    function highlightExactWordInCore(core, term, accentSensitive) {
+      const foldedTerm = foldForSearch(term.trim(), accentSensitive);
+      if (!foldedTerm) return escapeHtml(core);
+      const parts = core.split(/([\s-]+)/);
+      let html = "";
+      for (const part of parts) {
+        if (/^[\s-]+$/.test(part)) {
+          html += escapeHtml(part);
+          continue;
+        }
+        if (foldForSearch(part, accentSensitive) === foldedTerm) {
+          html += `<span class="mark">${escapeHtml(part)}</span>`;
+        } else {
+          html += escapeHtml(part);
+        }
+      }
+      return html;
+    }
+
+    function highlightLibelle(libelle, term, accentSensitive, exactWord) {
+      const t = term.trim();
+      if (!t) return escapeHtml(libelle);
+      try {
+        if (exactWord) {
+          const { article, core } = splitArticle(libelle);
+          const prefix = article ? escapeHtml(libelle.slice(0, libelle.indexOf(core))) : "";
+          return prefix + highlightExactWordInCore(core, t, accentSensitive);
+        }
+        const re = accentSensitive
+          ? new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi")
+          : accentPattern(t);
+        return escapeHtml(libelle).replace(re, (m) => `<span class="mark">${escapeHtml(m)}</span>`);
+      } catch {
+        return escapeHtml(libelle);
+      }
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function renderCommuneTable(rows, highlightTerm, accentSensitive, options = {}) {
+      const geocode = lastSearch?.geocodes || {};
+      const accent = accentSensitive ?? lastSearch?.accentSensitive ?? false;
+      const showMatchedTerm = options.showMatchedTerm ?? rows.some((r) => r.matchedTerm);
+      let html = `<div class="nested-table"><table><thead><tr>`;
+      if (showMatchedTerm) html += `<th>Terme recherché</th>`;
+      html += `<th>Nom</th><th>Mots</th><th>Article</th><th>Code</th><th>Dép.</th><th>Type</th>
+        <th>Lon</th><th>Lat</th><th>Score</th>
+      </tr></thead><tbody>`;
+      for (const r of rows) {
+        const g = geocode[r.COM + "|" + r.libelle] || {};
+        const termHighlight = r.matchedTerm ?? highlightTerm ?? "";
+        html += `<tr>`;
+        if (showMatchedTerm) {
+          html += `<td><code>${escapeHtml(r.matchedTerm || "—")}</code></td>`;
+        }
+        html += `
+          <td>${highlightLibelle(r.libelle, termHighlight, accent, lastSearch?.exactWord)}</td>
+          <td>${r.wordCount}</td>
+          <td>${escapeHtml(r.article || "—")}</td>
+          <td><code>${escapeHtml(r.COM)}</code></td>
+          <td>${escapeHtml(r.DEP || "—")}</td>
+          <td><span class="type-badge">${escapeHtml(r.typeLabel)}</span></td>
+          <td>${g.lon ?? "—"}</td>
+          <td>${g.lat ?? "—"}</td>
+          <td>${g.score != null ? g.score.toFixed(3) : "—"}</td>
+        </tr>`;
+      }
+      html += "</tbody></table></div>";
+      return html;
+    }
+
+    function resetResultsUI() {
+      listVisible = false;
+      $("results-summary").classList.remove("visible");
+      $("results-body").classList.remove("visible");
+      $("btn-toggle-list").textContent = "Voir la liste";
+      $("btn-toggle-list").disabled = true;
+      $("btn-export-summary").disabled = true;
+      $("btn-export-detail").disabled = true;
+      lastSearch = null;
+    }
+
+    function showSummary(countText, metaText) {
+      $("summary-count").textContent = countText;
+      $("summary-meta").textContent = metaText;
+      $("results-summary").classList.add("visible");
+      $("btn-export-summary").disabled = false;
+      $("btn-export-detail").disabled = false;
+    }
+
+    function resultLineCount(search) {
+      if (!search) return 0;
+      return search.hits.length;
+    }
+
+    function flattenMultiHits(groups) {
+      const hits = [];
+      for (const g of groups) {
+        for (const r of g.hits) {
+          hits.push({ ...r, matchedTerm: g.term });
+        }
+      }
+      return hits;
+    }
+
+    function renderSearchResults() {
+      if (!lastSearch?.hits.length) {
+        $("results-single").innerHTML = "<p>Aucune commune ne correspond.</p>";
+        return;
+      }
+      $("results-single").innerHTML = renderCommuneTable(
+        lastSearch.hits,
+        lastSearch.mode === "single" ? lastSearch.term : "",
+        lastSearch.accentSensitive,
+        { showMatchedTerm: lastSearch.mode === "multi" }
+      );
+    }
+
+    function setListPresentation(rowCount) {
+      const autoShow = rowCount > 0 && rowCount < AUTO_SHOW_LIST_MAX;
+      listVisible = autoShow;
+      $("results-body").classList.toggle("visible", autoShow);
+      $("btn-toggle-list").textContent = autoShow ? "Masquer la liste" : "Voir la liste";
+      $("btn-toggle-list").disabled = rowCount === 0;
+    }
+
+    async function runSearch() {
+      if (!allRows.length || searchRunning) return;
+      const position = getPosition();
+      const exact = $("exact-term").checked;
+      const exactWithArticle = exact && $("exact-with-article").checked;
+      const exactWord = !exact && $("exact-word").checked;
+      const accentSensitive = !$("ignore-accents").checked;
+      const pool = filteredPool();
+
+      if (mode === "single") {
+        const term = $("query-single").value;
+        const hits = searchTerm(term, pool, position, exact, exactWithArticle, exactWord, accentSensitive);
+        lastSearch = {
+          mode: "single",
+          term,
+          position,
+          exact,
+          exactWithArticle,
+          exactWord,
+          accentSensitive,
+          hits,
+          geocodes: {},
+        };
+        const posLabel = { anywhere: "n'importe où", start: "au début", end: "à la fin" }[position];
+        const accentLabel = accentSensitive ? "accents respectés" : "accents ignorés";
+        showSummary(
+          `${hits.length.toLocaleString("fr-FR")} commune${hits.length !== 1 ? "s" : ""}`,
+          `Terme « ${term.trim()} » (${posLabel}, ${matchModeLabel(exact, exactWithArticle, exactWord)}, ${accentLabel}) — périmètre : ${pool.length.toLocaleString("fr-FR")} entités`
+        );
+        renderSearchResults();
+        setListPresentation(hits.length);
+      } else {
+        const lines = $("query-multi").value.split(/\n/);
+        const terms = [];
+        const seen = new Set();
+        const dupCount = { n: 0 };
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t) continue;
+          terms.push(t);
+          const key = foldForSearch(t, accentSensitive);
+          if (seen.has(key)) dupCount.n++;
+          else seen.add(key);
+        }
+
+        if (!terms.length) {
+          alert("Saisissez au moins un terme à rechercher.");
+          return;
+        }
+
+        const jobId = ++searchJobId;
+        searchRunning = true;
+        $("btn-search").disabled = true;
+        resetResultsUI();
+        $("results-body").classList.remove("visible");
+        setSearchProgress(true, 0, terms.length, terms[0]);
+        $("results-summary").classList.add("visible");
+        $("summary-count").textContent = "Recherche en cours…";
+        $("summary-meta").textContent = `Analyse de ${terms.length.toLocaleString("fr-FR")} terme${terms.length !== 1 ? "s" : ""}`;
+
+        const groups = [];
+        try {
+          for (let i = 0; i < terms.length; i++) {
+            if (jobId !== searchJobId) return;
+            const term = terms[i];
+            groups.push({
+              term,
+              hits: searchTerm(term, pool, position, exact, exactWithArticle, exactWord, accentSensitive),
+            });
+            setSearchProgress(true, i + 1, terms.length, term);
+            if (i < terms.length - 1) await yieldToMain();
+          }
+        } finally {
+          if (jobId === searchJobId) {
+            searchRunning = false;
+            $("btn-search").disabled = false;
+            setSearchProgress(false);
+          }
+        }
+
+        if (jobId !== searchJobId) return;
+
+        const flatHits = flattenMultiHits(groups);
+        const totalHits = flatHits.length;
+        lastSearch = {
+          mode: "multi",
+          terms: groups,
+          hits: flatHits,
+          position,
+          exact,
+          exactWithArticle,
+          exactWord,
+          accentSensitive,
+          geocodes: {},
+          dupCount: dupCount.n,
+        };
+        const posLabel = { anywhere: "n'importe où", start: "au début", end: "à la fin" }[position];
+        const accentLabel = accentSensitive ? "accents respectés" : "accents ignorés";
+        let meta = `${terms.length} terme${terms.length !== 1 ? "s" : ""} (${posLabel}, ${matchModeLabel(exact, exactWithArticle, exactWord)}, ${accentLabel}) — ${totalHits.toLocaleString("fr-FR")} ligne${totalHits !== 1 ? "s" : ""} dans le tableau`;
+        if (dupCount.n) meta += ` — ${dupCount.n} doublon(s) dans la liste saisie`;
+        showSummary(
+          `${totalHits.toLocaleString("fr-FR")} correspondance${totalHits !== 1 ? "s" : ""}`,
+          meta
+        );
+        renderSearchResults();
+        setListPresentation(totalHits);
+      }
+    }
+
+    function toggleList() {
+      if (!lastSearch) return;
+      listVisible = !listVisible;
+      $("results-body").classList.toggle("visible", listVisible);
+      $("btn-toggle-list").textContent = listVisible ? "Masquer la liste" : "Voir la liste";
+    }
+
+    function downloadBlob(filename, content, mime) {
+      const blob = new Blob([content], { type: mime });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function csvEscape(val) {
+      const s = String(val ?? "");
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }
+
+    function exportSummaryCSV() {
+      if (!lastSearch) return;
+      let lines = [];
+      if (lastSearch.mode === "single") {
+        lines = ["terme;position;nb_communes", `${csvEscape(lastSearch.term)};${lastSearch.position};${lastSearch.hits.length}`];
+      } else {
+        lines = ["terme;nb_communes"];
+        for (const g of lastSearch.terms) {
+          lines.push(`${csvEscape(g.term)};${g.hits.length}`);
+        }
+      }
+      downloadBlob("communes-resume.csv", "\ufeff" + lines.join("\n"), "text/csv;charset=utf-8");
+    }
+
+    function flattenDetailRows() {
+      const geocode = lastSearch?.geocodes || {};
+      const rows = [];
+      if (lastSearch.mode === "single") {
+        for (const r of lastSearch.hits) {
+          rows.push({ terme: lastSearch.term, ...rowToExport(r, geocode) });
+        }
+      } else {
+        for (const r of lastSearch.hits) {
+          rows.push({ terme: r.matchedTerm, ...rowToExport(r, geocode) });
+        }
+      }
+      return rows;
+    }
+
+    function rowToExport(r, geocode) {
+      const g = geocode[r.COM + "|" + r.libelle] || {};
+      return {
+        libelle: r.libelle,
+        nb_mots: r.wordCount,
+        article: r.article,
+        code_insee: r.COM,
+        departement: r.DEP,
+        type: r.TYPECOM,
+        longitude: g.lon ?? "",
+        latitude: g.lat ?? "",
+        score_geocodage: g.score ?? "",
+      };
+    }
+
+    function exportDetailCSV() {
+      const rows = flattenDetailRows();
+      const headers = ["terme", "libelle", "nb_mots", "article", "code_insee", "departement", "type", "longitude", "latitude", "score_geocodage"];
+      const lines = [headers.join(";")];
+      for (const row of rows) {
+        lines.push(headers.map((h) => csvEscape(row[h])).join(";"));
+      }
+      downloadBlob("communes-detail.csv", "\ufeff" + lines.join("\n"), "text/csv;charset=utf-8");
+    }
+
+    function collectGeocodeTargets() {
+      if (!lastSearch) return [];
+      if (lastSearch.mode === "single") return lastSearch.hits;
+      const out = [];
+      const seen = new Set();
+      for (const r of lastSearch.hits) {
+        const key = r.COM + "|" + r.libelle;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push(r);
+        }
+      }
+      return out;
+    }
+
+    async function geocodeOne(row) {
+      const params = new URLSearchParams({
+        q: row.libelle,
+        index: "address",
+        type: "municipality",
+        citycode: row.COM,
+        limit: "1",
+        autocomplete: "0",
+      });
+      if (row.DEP) params.set("depcode", row.DEP);
+      const res = await fetch(`${GEOCODE_URL}?${params}`);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const feat = data.features?.[0];
+      if (!feat) return null;
+      const [lon, lat] = feat.geometry.coordinates;
+      return { lon, lat, score: feat.properties.score ?? null };
+    }
+
+    async function geocodeBatchCSV(targets) {
+      const header = "q;citycode;type\n";
+      const body = targets.map((r) =>
+        [csvEscape(r.libelle), csvEscape(r.COM), "municipality"].join(";")
+      ).join("\n");
+      const blob = new Blob(["\ufeff" + header + body], { type: "text/csv" });
+      const form = new FormData();
+      form.append("data", blob, "communes.csv");
+      form.append("columns", "q");
+      form.append("citycode", "citycode");
+      form.append("type", "type");
+      form.append("indexes", "address");
+      const res = await fetch(GEOCODE_CSV_URL, { method: "POST", body: form });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || "Échec du géocodage par lot");
+      }
+      return await res.text();
+    }
+
+    function parseGeocodeCsvResponse(text) {
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length < 2) return new Map();
+      const sep = lines[0].includes(";") ? ";" : ",";
+      const headers = lines[0].split(sep).map((h) => h.replace(/^\ufeff/, "").trim());
+      const idx = (name) => headers.findIndex((h) => h.toLowerCase() === name.toLowerCase());
+      const iCode = [idx("result_citycode"), idx("citycode"), idx("code_insee")].find((i) => i >= 0) ?? -1;
+      const iLon = [idx("longitude"), idx("lon")].find((i) => i >= 0) ?? -1;
+      const iLat = [idx("latitude"), idx("lat")].find((i) => i >= 0) ?? -1;
+      const iScore = [idx("result_score"), idx("score")].find((i) => i >= 0) ?? -1;
+      const map = new Map();
+      for (let li = 1; li < lines.length; li++) {
+        const cols = lines[li].split(sep);
+        const code = cols[iCode]?.replace(/^"|"$/g, "") ?? "";
+        const lon = parseFloat(cols[iLon]);
+        const lat = parseFloat(cols[iLat]);
+        const score = iScore >= 0 ? parseFloat(cols[iScore]) : null;
+        if (code && !Number.isNaN(lon) && !Number.isNaN(lat)) {
+          map.set(code, { lon, lat, score: Number.isNaN(score) ? null : score });
+        }
+      }
+      return map;
+    }
+
+    async function runGeocode() {
+      const targets = collectGeocodeTargets();
+      if (!targets.length) {
+        alert("Aucune commune à géocoder.");
+        return;
+      }
+      if (targets.length > 5000) {
+        alert("Trop de communes (> 5000). Affinez la recherche.");
+        return;
+      }
+      if (!confirm(`Géocoder ${targets.length.toLocaleString("fr-FR")} commune(s) via la Géoplateforme ?`)) return;
+
+      lastSearch.geocodes = lastSearch.geocodes || {};
+      const prog = $("geocode-progress");
+      const fill = $("geocode-progress-fill");
+      const ptext = $("geocode-progress-text");
+      prog.classList.add("visible");
+      $("btn-geocode").disabled = true;
+
+      try {
+        if (targets.length > 80) {
+          ptext.textContent = "Envoi du lot à l’API…";
+          fill.style.width = "30%";
+          const csvOut = await geocodeBatchCSV(targets);
+          const byCode = parseGeocodeCsvResponse(csvOut);
+          for (const r of targets) {
+            const g = byCode.get(r.COM);
+            if (g) lastSearch.geocodes[r.COM + "|" + r.libelle] = g;
+          }
+          fill.style.width = "100%";
+          ptext.textContent = `Terminé — ${byCode.size.toLocaleString("fr-FR")} résultat(s) géocodé(s).`;
+        } else {
+          let done = 0;
+          const concurrency = 5;
+          let idx = 0;
+          async function worker() {
+            while (idx < targets.length) {
+              const i = idx++;
+              const r = targets[i];
+              try {
+                const g = await geocodeOne(r);
+                if (g) lastSearch.geocodes[r.COM + "|" + r.libelle] = g;
+              } catch (e) {
+                console.warn("Geocode failed", r.COM, e);
+              }
+              done++;
+              const pct = Math.round((done / targets.length) * 100);
+              fill.style.width = pct + "%";
+              ptext.textContent = `Géocodage… ${done}/${targets.length}`;
+            }
+          }
+          await Promise.all(Array.from({ length: concurrency }, () => worker()));
+          ptext.textContent = `Terminé — ${done.toLocaleString("fr-FR")} requête(s).`;
+        }
+        refreshResultTables();
+      } catch (e) {
+        alert("Erreur de géocodage : " + e.message);
+        ptext.textContent = "";
+      } finally {
+        $("btn-geocode").disabled = false;
+      }
+    }
+
+    function refreshResultTables() {
+      if (!lastSearch) return;
+      renderSearchResults();
+    }
+
+    $("tab-single").addEventListener("click", () => {
+      mode = "single";
+      $("tab-single").setAttribute("aria-selected", "true");
+      $("tab-multi").setAttribute("aria-selected", "false");
+      $("panel-single").classList.remove("hidden");
+      $("panel-multi").classList.add("hidden");
+      resetResultsUI();
+    });
+
+    $("tab-multi").addEventListener("click", () => {
+      mode = "multi";
+      $("tab-multi").setAttribute("aria-selected", "true");
+      $("tab-single").setAttribute("aria-selected", "false");
+      $("panel-multi").classList.remove("hidden");
+      $("panel-single").classList.add("hidden");
+      resetResultsUI();
+    });
+
+    $("exact-term").addEventListener("change", () => {
+      if ($("exact-term").checked) $("exact-word").checked = false;
+      syncSearchModeOptions();
+    });
+    $("exact-word").addEventListener("change", () => {
+      if ($("exact-word").checked) $("exact-term").checked = false;
+      syncSearchModeOptions();
+    });
+    syncSearchModeOptions();
+
+    $("btn-search").addEventListener("click", runSearch);
+    $("query-single").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runSearch();
+    });
+    $("btn-toggle-list").addEventListener("click", toggleList);
+    $("btn-export-summary").addEventListener("click", exportSummaryCSV);
+    $("btn-export-detail").addEventListener("click", exportDetailCSV);
+    $("btn-geocode").addEventListener("click", runGeocode);
+
+    $("btn-pick-csv").addEventListener("click", () => $("csv-file").click());
+    $("csv-file").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await loadCSVFromText(await file.text());
+    });
+
+    tryFetchCSV();
+  </script>
+</body>
+</html>
