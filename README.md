@@ -16,4 +16,7 @@ Puis ouvrir [http://127.0.0.1:8765/index.html](http://127.0.0.1:8765/index.html)
 
 ## Données
 
-Fichier `v_commune_2026.csv` — colonne `LIBELLE` pour le nom affiché des communes.
+- `v_commune_2026.csv` — colonne `LIBELLE` pour le nom affiché des communes.
+- `depcomplets.geojson` — contours des départements (fond de carte ; outre-mer en encarts).
+
+Après géocodage des résultats, le bouton **Faire la carte** affiche les communes sur une carte D3 (métropole + Corse, DOM en bandeau « îles » en bas).

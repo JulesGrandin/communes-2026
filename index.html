@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Explorateur de noms de communes — France 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script>
   <style>
     :root {
       --bg: #f4f2ed;
@@ -325,6 +327,136 @@
       margin-top: 2rem;
     }
 
+    #map-section.hidden { display: none; }
+
+    #btn-make-map.hidden { display: none; }
+
+    .map-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .map-toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .map-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .map-toggle-text {
+      font-size: 0.9rem;
+      color: var(--ink);
+    }
+
+    .map-toggle-switch {
+      position: relative;
+      width: 2.75rem;
+      height: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .map-toggle-switch input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .map-toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #d6d3d1;
+      border-radius: 999px;
+      transition: background 0.2s;
+    }
+
+    .map-toggle-slider::before {
+      content: "";
+      position: absolute;
+      width: 1.15rem;
+      height: 1.15rem;
+      left: 0.18rem;
+      top: 0.18rem;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 2px rgb(28 25 23 / 20%);
+      transition: transform 0.2s;
+    }
+
+    .map-toggle-switch input:checked + .map-toggle-slider {
+      background: var(--accent);
+    }
+
+    .map-toggle-switch input:checked + .map-toggle-slider::before {
+      transform: translateX(1.25rem);
+    }
+
+    .map-toggle-switch input:focus-visible + .map-toggle-slider {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    #map-container {
+      width: 100%;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    #map-container svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .map-dep {
+      fill: #f5f4f0;
+      stroke: #a8a29e;
+      stroke-width: 0.6;
+    }
+
+    .map-separator {
+      stroke: #78716c;
+      stroke-width: 1;
+    }
+
+    .map-overseas-inset-label {
+      font-size: 8px;
+      fill: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .commune-point {
+      fill: var(--accent);
+      stroke: #fff;
+      stroke-width: 1;
+    }
+
+    .commune-label {
+      font-size: 10px;
+      fill: var(--ink);
+      paint-order: stroke;
+      stroke: #fff;
+      stroke-width: 2px;
+      stroke-linejoin: round;
+    }
+
     @media (max-width: 640px) {
       th:nth-child(4), td:nth-child(4),
       th:nth-child(5), td:nth-child(5) {
@@ -422,11 +554,33 @@
       <div id="results-single"></div>
       <div class="actions" style="margin-top:1rem;">
         <button type="button" class="secondary" id="btn-geocode">Géocoder les résultats affichés</button>
+        <button type="button" class="secondary hidden" id="btn-make-map" disabled>Faire la carte</button>
       </div>
       <div id="geocode-progress" class="progress">
         <span id="geocode-progress-text"></span>
         <div class="progress-bar"><div id="geocode-progress-fill"></div></div>
       </div>
+    </section>
+
+    <section id="map-section" class="panel hidden" aria-label="Carte des résultats">
+      <h2 style="margin:0 0 0.75rem;font-size:1.1rem;">Carte des communes géocodées</h2>
+      <div class="map-toolbar">
+        <span id="map-point-count" class="meta" style="color:var(--muted);font-size:0.85rem;"></span>
+        <div class="map-toolbar-actions">
+          <label class="map-toggle">
+            <span class="map-toggle-text">Noms des communes</span>
+            <span class="map-toggle-switch">
+              <input type="checkbox" id="map-show-labels" checked aria-label="Afficher les noms des communes sur la carte" />
+              <span class="map-toggle-slider" aria-hidden="true"></span>
+            </span>
+          </label>
+          <button type="button" class="secondary" id="btn-export-map-svg" disabled>Télécharger SVG</button>
+        </div>
+      </div>
+      <div id="map-container" role="img" aria-label="Carte de France avec les communes trouvées"></div>
+      <p class="note" style="margin:0.75rem 0 0;font-size:0.8rem;color:var(--muted);">
+        Fond cartographique : Lambert-93 (EPSG:2154) et rapprochement des DOM calqué sur la méthode d’<a href="https://observablehq.com/@ericmauviere/le-fond-de-carte-simplifie-des-communes-2021-avec-droms-rapp" target="_blank" rel="noopener">Éric Mauvière</a> (Web Mercator + translation/échelle).
+      </p>
     </section>
 
     <footer class="note">
@@ -437,9 +591,27 @@
 
   <script>
     const CSV_PATH = "v_commune_2026.csv";
+    const DEPS_GEOJSON_PATH = "depcomplets.geojson";
     const GEOCODE_URL = "https://data.geopf.fr/geocodage/search";
     const GEOCODE_CSV_URL = "https://data.geopf.fr/geocodage/search/csv";
     const AUTO_SHOW_LIST_MAX = 100;
+    const OVERSEAS_DEP_CODES = new Set(["971", "972", "973", "974", "976"]);
+    const DOM_DISPLAY_ORDER = ["973", "972", "971", "974", "976"];
+    const WEB_MERCATOR_R = 6378137;
+    /** Échelles Mapshaper (Éric Mauvière / Icem7) pour le rapprochement des DOM. */
+    const DROM_RAPP_SCALES = { 971: 1.5, 972: 1.5, 973: 0.35, 974: 1.5, 976: 1.5 };
+    /** Ancres en EPSG:3857 (centroïdes depcomplets → cibles a-dep2021 rapproché). */
+    const DROM_ANCHORS = {
+      971: { raw3857: [-6835469.428921484, 1825944.4983694197], rapp3857: [-423797.0234616112, 5122432.129137927] },
+      972: { raw3857: [-6792710.000390188, 1647363.0555395985], rapp3857: [-271762.7397219662, 5141749.66169763] },
+      973: { raw3857: [-5912616.784258822, 438062.0999974651], rapp3857: [-124862.83991038062, 5145820.18770184] },
+      974: { raw3857: [6181124.383848672, -2407318.8738436764], rapp3857: [24585.050678267195, 5152912.164451577] },
+      976: { raw3857: [5024918.609703008, -1441006.7809634847], rapp3857: [143161.5509621058, 5156541.750464348] },
+    };
+
+    let depsGeoJsonCache = null;
+    let depsGeoJsonMapCache = null;
+    let mapRendered = false;
 
     const TYPE_LABELS = {
       COM: "Commune",
@@ -788,6 +960,339 @@
       $("btn-export-summary").disabled = true;
       $("btn-export-detail").disabled = true;
       lastSearch = null;
+      mapRendered = false;
+      $("map-section").classList.add("hidden");
+      $("map-container").innerHTML = "";
+      syncMapControls();
+    }
+
+    function collectMapPoints() {
+      if (!lastSearch) return [];
+      const geocode = lastSearch.geocodes || {};
+      const points = [];
+      for (const r of lastSearch.hits) {
+        const g = geocode[r.COM + "|" + r.libelle];
+        if (g && g.lon != null && g.lat != null && !Number.isNaN(g.lon) && !Number.isNaN(g.lat)) {
+          points.push({
+            lon: g.lon,
+            lat: g.lat,
+            libelle: r.libelle,
+            dep: String(r.DEP || ""),
+            com: r.COM,
+          });
+        }
+      }
+      return points;
+    }
+
+    function syncMapControls() {
+      const points = collectMapPoints();
+      const btn = $("btn-make-map");
+      const hasPoints = points.length > 0;
+      btn.classList.toggle("hidden", !hasPoints);
+      btn.disabled = !hasPoints;
+      if (!hasPoints) {
+        $("map-section").classList.add("hidden");
+        mapRendered = false;
+      }
+      syncMapExportButton();
+    }
+
+    function syncMapExportButton() {
+      $("btn-export-map-svg").disabled = !mapRendered;
+    }
+
+    function prepareSvgForIllustrator(svgEl) {
+      const clone = svgEl.cloneNode(true);
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+      clone.setAttribute("version", "1.1");
+      clone.removeAttribute("role");
+
+      const vb = clone.getAttribute("viewBox");
+      if (vb) {
+        const parts = vb.trim().split(/\s+/).map(Number);
+        if (parts.length === 4 && parts.every((n) => !Number.isNaN(n))) {
+          clone.setAttribute("width", String(parts[2]));
+          clone.setAttribute("height", String(parts[3]));
+        }
+      }
+
+      clone.querySelectorAll(".map-dep").forEach((el) => {
+        el.removeAttribute("class");
+        el.setAttribute("fill", "#f5f4f0");
+        el.setAttribute("stroke", "#a8a29e");
+        el.setAttribute("stroke-width", "0.6");
+        el.setAttribute("fill-rule", "evenodd");
+      });
+
+      clone.querySelectorAll(".map-separator").forEach((el) => {
+        el.removeAttribute("class");
+        el.setAttribute("fill", "none");
+        el.setAttribute("stroke", "#78716c");
+        el.setAttribute("stroke-width", "1");
+      });
+
+      clone.querySelectorAll(".commune-point").forEach((el) => {
+        el.removeAttribute("class");
+        el.setAttribute("fill", "#0f766e");
+        el.setAttribute("stroke", "#ffffff");
+        el.setAttribute("stroke-width", "1");
+      });
+
+      clone.querySelectorAll(".commune-label").forEach((el) => {
+        el.removeAttribute("class");
+        el.setAttribute("fill", "#1c1917");
+        el.setAttribute("font-family", "Arial, Helvetica, sans-serif");
+        el.setAttribute("font-size", "10");
+        el.setAttribute("stroke", "none");
+      });
+
+      const layerNames = {
+        "map-metro": "Metropole",
+        "map-dom": "Outre_mer",
+        "map-points": "Points_communes",
+      };
+      clone.querySelectorAll("g[class]").forEach((g) => {
+        const cls = g.getAttribute("class") || "";
+        if (layerNames[cls]) {
+          g.setAttribute("id", layerNames[cls]);
+          g.removeAttribute("class");
+        }
+      });
+
+      return clone;
+    }
+
+    function exportMapSvg() {
+      const svgEl = $("map-container").querySelector("svg");
+      if (!svgEl) {
+        alert("Générez d’abord la carte.");
+        return;
+      }
+      const clone = prepareSvgForIllustrator(svgEl);
+      const serializer = new XMLSerializer();
+      let svgText = serializer.serializeToString(clone);
+      if (!svgText.startsWith("<?xml")) {
+        svgText = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + svgText;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadBlob(`carte-communes-${stamp}.svg`, svgText, "image/svg+xml;charset=utf-8");
+    }
+
+    async function loadDepsGeoJson() {
+      if (depsGeoJsonCache) return depsGeoJsonCache;
+      const res = await fetch(DEPS_GEOJSON_PATH);
+      if (!res.ok) throw new Error("Impossible de charger " + DEPS_GEOJSON_PATH);
+      depsGeoJsonCache = await res.json();
+      return depsGeoJsonCache;
+    }
+
+    function wgs84To3857(lon, lat) {
+      const x = WEB_MERCATOR_R * ((lon * Math.PI) / 180);
+      const y = WEB_MERCATOR_R * Math.log(Math.tan(Math.PI / 4 + ((lat * Math.PI) / 180) / 2));
+      return [x, y];
+    }
+
+    function wgs3857ToWgs84(x, y) {
+      const lon = (x / WEB_MERCATOR_R) * (180 / Math.PI);
+      const lat = (180 / Math.PI) * (2 * Math.atan(Math.exp(y / WEB_MERCATOR_R)) - Math.PI / 2);
+      return [lon, lat];
+    }
+
+    function transformLonLatForDrom(lon, lat, depCode) {
+      const dep = String(depCode || "");
+      if (!OVERSEAS_DEP_CODES.has(dep)) return [lon, lat];
+      const anchor = DROM_ANCHORS[dep];
+      const scale = DROM_RAPP_SCALES[dep];
+      if (!anchor || scale == null) return [lon, lat];
+      const [x, y] = wgs84To3857(lon, lat);
+      const [xr, yr] = anchor.raw3857;
+      const [xa, ya] = anchor.rapp3857;
+      return wgs3857ToWgs84((x - xr) * scale + xa, (y - yr) * scale + ya);
+    }
+
+    function walkGeometryCoordinates(geometry, mapCoord) {
+      const { type, coordinates } = geometry;
+      if (type === "Point") {
+        geometry.coordinates = mapCoord(coordinates);
+        return;
+      }
+      if (type === "MultiPoint" || type === "LineString") {
+        geometry.coordinates = coordinates.map(mapCoord);
+        return;
+      }
+      if (type === "MultiLineString" || type === "Polygon") {
+        geometry.coordinates = coordinates.map((ring) => ring.map(mapCoord));
+        return;
+      }
+      if (type === "MultiPolygon") {
+        geometry.coordinates = coordinates.map((poly) => poly.map((ring) => ring.map(mapCoord)));
+      }
+    }
+
+    function featureWithDromRapp(feature) {
+      const dep = String(feature.properties.INSEE_DEP || "");
+      const cloned = JSON.parse(JSON.stringify(feature));
+      if (!OVERSEAS_DEP_CODES.has(dep)) return cloned;
+      walkGeometryCoordinates(cloned.geometry, ([lon, lat]) => transformLonLatForDrom(lon, lat, dep));
+      return cloned;
+    }
+
+    async function loadDepartmentsForMap() {
+      if (depsGeoJsonMapCache) return depsGeoJsonMapCache;
+      const raw = await loadDepsGeoJson();
+      depsGeoJsonMapCache = {
+        type: "FeatureCollection",
+        features: raw.features.map(featureWithDromRapp),
+      };
+      return depsGeoJsonMapCache;
+    }
+
+    function ensureProj4Lambert93() {
+      if (window.__proj4LambertReady) return;
+      proj4.defs(
+        "EPSG:2154",
+        "+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+      );
+      window.__proj4LambertReady = true;
+    }
+
+    /** Projection D3 ↔ Lambert-93 via proj4 (méthode Philippe Rivière / Éric Mauvière). */
+    function proj4d3(epsgCode) {
+      ensureProj4Lambert93();
+      const raw = proj4("EPSG:" + epsgCode);
+      const degrees = 180 / Math.PI;
+      const radians = 1 / degrees;
+      const p = (lambda, phi) => raw.forward([lambda * degrees, phi * degrees]);
+      p.invert = (x, y) => raw.inverse([x, y]).map((d) => d * radians);
+      const projection = d3.geoProjection(p).scale(1);
+      projection.raw = raw;
+      return projection;
+    }
+
+    function isDomDep(depCode) {
+      return OVERSEAS_DEP_CODES.has(String(depCode || ""));
+    }
+
+    async function renderResultsMap(showLabels) {
+      const points = collectMapPoints();
+      if (!points.length) return;
+
+      const geojson = await loadDepartmentsForMap();
+      const container = $("map-container");
+      const width = Math.min(920, container.clientWidth || 920);
+      const pad = 12;
+      const domBandH = Math.max(78, Math.round(width * 0.11));
+      const mainH = Math.round(width * 0.92);
+      const height = mainH + domBandH + 20;
+      const sepY = mainH + 6;
+      const domTop = sepY + 10;
+
+      const metroFeatures = geojson.features.filter((f) => !isDomDep(f.properties.INSEE_DEP));
+      const domByCode = new Map(
+        geojson.features
+          .filter((f) => isDomDep(f.properties.INSEE_DEP))
+          .map((f) => [String(f.properties.INSEE_DEP), f])
+      );
+      const metroFc = { type: "FeatureCollection", features: metroFeatures };
+
+      const projMetro = proj4d3(2154).fitExtent(
+        [
+          [pad, pad],
+          [width - pad, mainH - pad],
+        ],
+        metroFc
+      );
+      const pathMetro = d3.geoPath(projMetro);
+
+      const domGap = 10;
+      const domSlotW = (width - pad * 2 - domGap * (DOM_DISPLAY_ORDER.length - 1)) / DOM_DISPLAY_ORDER.length;
+      const projDomByDep = new Map();
+      DOM_DISPLAY_ORDER.forEach((code, i) => {
+        const feature = domByCode.get(code);
+        if (!feature) return;
+        const x0 = pad + i * (domSlotW + domGap);
+        projDomByDep.set(
+          code,
+          proj4d3(2154).fitExtent(
+            [
+              [x0, domTop],
+              [x0 + domSlotW, height - pad],
+            ],
+            feature
+          )
+        );
+      });
+
+      const svg = d3
+        .select(container)
+        .selectAll("svg")
+        .data([0])
+        .join("svg")
+        .attr("viewBox", `0 0 ${width} ${height}`)
+        .attr("role", "img");
+
+      svg.selectAll("*").remove();
+
+      svg
+        .append("g")
+        .attr("class", "map-metro")
+        .selectAll("path")
+        .data(metroFeatures)
+        .join("path")
+        .attr("class", "map-dep")
+        .attr("d", pathMetro);
+
+      svg
+        .append("line")
+        .attr("class", "map-separator")
+        .attr("x1", pad)
+        .attr("x2", width - pad)
+        .attr("y1", sepY)
+        .attr("y2", sepY);
+
+      const domG = svg.append("g").attr("class", "map-dom");
+      DOM_DISPLAY_ORDER.forEach((code) => {
+        const feature = domByCode.get(code);
+        const projDom = projDomByDep.get(code);
+        if (!feature || !projDom) return;
+        domG.append("path").attr("class", "map-dep").attr("d", d3.geoPath(projDom)(feature));
+      });
+
+      const pointsG = svg.append("g").attr("class", "map-points");
+      for (const p of points) {
+        const [lon, lat] = transformLonLatForDrom(p.lon, p.lat, p.dep);
+        const dep = String(p.dep || "");
+        const proj = isDomDep(dep) ? projDomByDep.get(dep) : projMetro;
+        if (!proj) continue;
+        const xy = proj([lon, lat]);
+        if (!xy) continue;
+        const g = pointsG.append("g").attr("transform", `translate(${xy[0]},${xy[1]})`);
+        g.append("circle").attr("class", "commune-point").attr("r", 4.5);
+        if (showLabels) {
+          g.append("text").attr("class", "commune-label").attr("x", 7).attr("y", 4).text(p.libelle);
+        }
+      }
+
+      $("map-point-count").textContent = `${points.length.toLocaleString("fr-FR")} point${points.length !== 1 ? "s" : ""} sur la carte`;
+      mapRendered = true;
+      syncMapExportButton();
+    }
+
+    async function showResultsMap() {
+      const points = collectMapPoints();
+      if (!points.length) {
+        alert("Géocodez au moins une commune avant de faire la carte.");
+        return;
+      }
+      $("map-section").classList.remove("hidden");
+      $("map-section").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      try {
+        await renderResultsMap($("map-show-labels").checked);
+      } catch (e) {
+        alert("Erreur lors de la carte : " + e.message);
+      }
     }
 
     function showSummary(countText, metaText) {
@@ -1043,7 +1548,7 @@
         limit: "1",
         autocomplete: "0",
       });
-      if (row.DEP) params.set("depcode", row.DEP);
+      // Ne pas passer depcode : le code Insee (citycode) suffit ; depcode=971/974… renvoie 0 résultat côté API.
       const res = await fetch(`${GEOCODE_URL}?${params}`);
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
@@ -1152,6 +1657,10 @@
           ptext.textContent = `Terminé — ${done.toLocaleString("fr-FR")} requête(s).`;
         }
         refreshResultTables();
+        syncMapControls();
+        if (mapRendered && !$("map-section").classList.contains("hidden")) {
+          renderResultsMap($("map-show-labels").checked);
+        }
       } catch (e) {
         alert("Erreur de géocodage : " + e.message);
         ptext.textContent = "";
@@ -1163,6 +1672,7 @@
     function refreshResultTables() {
       if (!lastSearch) return;
       renderSearchResults();
+      syncMapControls();
     }
 
     $("tab-single").addEventListener("click", () => {
@@ -1201,6 +1711,14 @@
     $("btn-export-summary").addEventListener("click", exportSummaryCSV);
     $("btn-export-detail").addEventListener("click", exportDetailCSV);
     $("btn-geocode").addEventListener("click", runGeocode);
+    $("btn-make-map").addEventListener("click", showResultsMap);
+    $("btn-export-map-svg").addEventListener("click", exportMapSvg);
+    $("map-show-labels").addEventListener("change", () => {
+      if (mapRendered && !$("map-section").classList.contains("hidden")) {
+        renderResultsMap($("map-show-labels").checked);
+      }
+    });
+    syncMapControls();
 
     $("btn-pick-csv").addEventListener("click", () => $("csv-file").click());
     $("csv-file").addEventListener("change", async (e) => {
